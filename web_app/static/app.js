@@ -420,8 +420,9 @@ async function loadModelEvaluation() {
       </div>
 
       <div>
-        <div style="font-size:11px;font-weight:700;color:var(--text-1);text-transform:uppercase;margin-bottom:6px;">
-          Cross-Model Signal Agreement Matrix
+        <div style="font-size:11px;font-weight:700;color:var(--text-1);text-transform:uppercase;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">
+          <span>Cross-Model Signal Agreement &amp; Predictive Performance</span>
+          <span style="font-size:10px;color:var(--text-2);font-weight:normal;text-transform:none;">Evaluated strictly on unseen out-of-sample test data</span>
         </div>
         <table class="data-table">
           <thead>
@@ -433,6 +434,7 @@ async function loadModelEvaluation() {
               <th>Random Forest</th>
               <th>LightGBM</th>
               <th>Consensus Verdict</th>
+              <th title="Recommendation based solely on validated out-of-sample predictive accuracy, independent of trading PnL" style="cursor:help;">BEST PREDICTING MODEL</th>
             </tr>
           </thead>
           <tbody>`;
@@ -447,18 +449,28 @@ async function loadModelEvaluation() {
         const m = (st.models && st.models[key]) || {};
         const sig = m.signal || 'WAIT';
         const pUp = m.p_up !== undefined ? (m.p_up * 100).toFixed(0) : '—';
-        return `<span class="signal-tag ${getSignalClass(sig)}">${esc(sig.split('/')[0].trim())}</span> <span class="mono" style="font-size:11px;color:var(--text-2);margin-left:4px;">${pUp}%</span>`;
+        const acc = m.directional_accuracy_pct !== undefined ? `<span class="mono" style="font-size:10px;color:var(--text-2);display:block;margin-top:2px;">${m.directional_accuracy_pct.toFixed(1)}% acc</span>` : '';
+        return `<td><span class="signal-tag ${getSignalClass(sig)}">${esc(sig.split('/')[0].trim())}</span> <span class="mono" style="font-size:11px;color:var(--text-2);margin-left:4px;">${pUp}%</span>${acc}</td>`;
       }
+
+      const rec = st.best_predicting_model || {};
+      const winner = rec.winner || 'Similar Performance';
+      const tooltip = rec.tooltip || 'Dynamically evaluated on out-of-sample data, strictly independent of trading PnL.';
+      const isSimilar = winner.includes('Similar') || rec.status === 'TIED';
+      const badgeStyle = isSimilar 
+        ? 'background:rgba(234,179,8,0.15);color:#eab308;border:1px solid rgba(234,179,8,0.3);padding:3px 8px;border-radius:4px;font-size:11px;font-weight:700;cursor:help;display:inline-block;'
+        : 'background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.4);padding:3px 8px;border-radius:4px;font-size:11px;font-weight:700;cursor:help;display:inline-block;';
 
       html += `
         <tr>
           <td><button class="ticker-link" onclick="openChartFor('${esc(st.symbol)}')">${esc(symClean)}</button></td>
           <td class="num mono">${fmtPrice(close)}</td>
           <td class="num mono ${chgClass}">${fmtPct(chg)}</td>
-          <td>${renderModelCell('logistic_regression')}</td>
-          <td>${renderModelCell('random_forest')}</td>
-          <td>${renderModelCell('lightgbm')}</td>
+          ${renderModelCell('logistic_regression')}
+          ${renderModelCell('random_forest')}
+          ${renderModelCell('lightgbm')}
           <td><span class="signal-tag ${getSignalClass(st.consensus)}">${esc(st.consensus || 'NEUTRAL')}</span></td>
+          <td><span style="${badgeStyle}" title="${esc(tooltip)}">★ ${esc(winner)}</span></td>
         </tr>`;
     });
 

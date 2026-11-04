@@ -12,7 +12,7 @@ import json
 import warnings
 from pathlib import Path
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Dict, Any, List
 
 os.environ["PYTHONWARNINGS"] = "ignore"
 warnings.simplefilter("ignore")
@@ -20,6 +20,7 @@ warnings.simplefilter("ignore")
 import numpy as np
 import pandas as pd
 import joblib
+import yfinance as yf
 from fastapi import FastAPI, Query, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
@@ -30,6 +31,7 @@ import random
 # Import live prediction engine helpers
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT / "web_app"))
 from predict_live_market import (
     DEFAULT_UNIVERSE,
     FEATURE_COLS,
@@ -37,7 +39,8 @@ from predict_live_market import (
     compute_quantara_features,
     load_model_suite,
 )
-from api_contract_adapter import router as adapter_router
+from model_evaluator import compute_all_models_predictive_metrics
+from api_contract_adapter import router as adapter_router, MASTER_TICKERS
 
 app = FastAPI(title="Quantara AI Institutional Research Platform", version="1.0.0")
 
@@ -141,6 +144,13 @@ def fetch_realtime_market_quotes() -> Dict[str, Any]:
 
         if quotes:
             _LAST_QUOTE_FETCH_TIME = datetime.now()
+            # Synchronize adapter's MASTER_TICKERS with authentic live quotes
+            for t in MASTER_TICKERS:
+                s = t.get("symbol")
+                if s in _REALTIME_PRICE_CACHE:
+                    t["price"] = _REALTIME_PRICE_CACHE[s]
+                    prev_c = _PREV_CLOSE_CACHE.get(s, t["price"])
+                    t["change_pct"] = round(((t["price"] - prev_c) / prev_c * 100.0), 2) if prev_c > 0 else 0.0
     except Exception as e:
         print(f"Error fetching batch real-time quotes: {e}")
 
@@ -161,6 +171,22 @@ def fetch_realtime_market_quotes() -> Dict[str, Any]:
                 "timestamp": datetime.now().isoformat()
             }
     return quotes
+
+
+async def _background_market_refresh():
+    """Periodic background task refreshing quotes from Yahoo Finance every 45s."""
+    while True:
+        try:
+            await asyncio.to_thread(fetch_realtime_market_quotes)
+        except Exception as e:
+            print(f"Background market quote refresh error: {e}")
+        await asyncio.sleep(45)
+
+
+@app.on_event("startup")
+async def startup_event():
+    # Initial immediate quote fetch
+    asyncio.create_task(_background_market_refresh())
 
 
 @app.get("/api/market/realtime-prices")
@@ -197,19 +223,13 @@ async def websocket_ticks(websocket: WebSocket):
     await websocket.accept()
     loop_count = 0
     try:
-        # Fetch fresh market prices at initial connection
-        fetch_realtime_market_quotes()
         while True:
             loop_count += 1
-            # Refresh live market prices from yfinance every 60 iterations (~60 seconds)
-            if loop_count % 60 == 0:
-                fetch_realtime_market_quotes()
-
             ticks = []
-            for sym, base_price in _REALTIME_PRICE_CACHE.items():
+            for sym, base_price in list(_REALTIME_PRICE_CACHE.items()):
                 prev_close = _PREV_CLOSE_CACHE.get(sym, base_price)
                 # Realistic tick micro-variance around real price (within 0.05%)
-                drift = random.uniform(-0.0005, 0.0005)
+                drift = random.uniform(-0.0004, 0.0004)
                 cur_price = round(base_price * (1.0 + drift), 2)
                 _REALTIME_PRICE_CACHE[sym] = cur_price
                 spread = round(max(0.05, cur_price * 0.0002), 2)
@@ -310,6 +330,9 @@ def get_live_predictions(
             regime_advice = "Unfavorable market regime! Quantara Rule F advises holding up to 100% Cash."
             regime_action = "DEFENSIVE_CASH"
 
+        # Evaluated out-of-sample predictive performance metrics
+        eval_metrics = compute_all_models_predictive_metrics("test").get("stocks", {})
+
         predictions = []
         for sym, feat_row in feature_data.items():
             probs = model_obj.predict_proba(feat_row)[0]
@@ -331,6 +354,14 @@ def get_live_predictions(
             else:
                 signal = "WAIT / CHOP"
 
+            best_info = eval_metrics.get(sym, {}).get("recommendation", {
+                "winner": "Similar Performance",
+                "badge_text": "Similar Performance",
+                "status": "TIED",
+                "tooltip": "Recommendation based on validated out-of-sample predictive performance."
+            })
+            model_evals = eval_metrics.get(sym, {}).get("models", {})
+
             predictions.append({
                 "Symbol": sym,
                 "Close": round(last_close, 2),
@@ -346,6 +377,8 @@ def get_live_predictions(
                 "conviction": round(conviction, 4),
                 "signal": signal,
                 "latest_bar_date": df_sym.index[-1].strftime("%Y-%m-%d"),
+                "best_predicting_model": best_info,
+                "model_accuracy_metrics": model_evals,
             })
 
         predictions_sorted = sorted(predictions, key=lambda x: x["conviction"], reverse=True)
@@ -532,16 +565,20 @@ def get_top_models():
 
 
 @app.get("/api/all-models-comparison")
-def get_all_models_comparison():
-    """Return side-by-side predictions for all 3 models across all stocks with consensus scoring."""
-    MODELS = ["logistic_regression", "random_forest", "lightgbm"]
+def get_all_models_comparison(eval_window: str = Query("test", description="Evaluation window: test, val, or combined")):
+    """Return side-by-side predictions for all 3 models across all stocks with consensus scoring and dynamic best predicting model recommendation."""
+    MODELS = ["random_forest", "logistic_regression", "lightgbm"]
     MODEL_LABELS = {
-        "logistic_regression": "Logistic Regression (Rank #1)",
-        "random_forest": "Random Forest (Rank #2)",
-        "lightgbm": "LightGBM (Rank #3)"
+        "random_forest": "Random Forest",
+        "logistic_regression": "Logistic Regression",
+        "lightgbm": "LightGBM"
     }
 
     try:
+        # Load evaluated out-of-sample predictive metrics
+        eval_payload = compute_all_models_predictive_metrics(eval_window)
+        eval_data = eval_payload.get("stocks", {})
+
         # Load all 3 models
         loaded_models = {}
         for m in MODELS:
@@ -571,10 +608,27 @@ def get_all_models_comparison():
                 buy_votes = 0
                 sell_votes = 0
 
+                stock_eval = eval_data.get(sym, {})
+                stock_models_eval = stock_eval.get("models", {})
+
                 for m in MODELS:
+                    m_eval = stock_models_eval.get(m, {})
+                    dir_acc = m_eval.get("directional_accuracy_pct")
+                    f1_val = m_eval.get("macro_f1_pct")
+                    acc_val = m_eval.get("accuracy_pct")
+
                     m_obj = loaded_models.get(m)
                     if m_obj is None:
-                        model_res[m] = {"signal": "WAIT / CHOP", "p_up": 0.33, "p_hold": 0.34, "p_down": 0.33, "conviction": 0.0}
+                        model_res[m] = {
+                            "signal": "WAIT / CHOP",
+                            "p_up": 0.33,
+                            "p_hold": 0.34,
+                            "p_down": 0.33,
+                            "conviction": 0.0,
+                            "directional_accuracy_pct": dir_acc,
+                            "accuracy_pct": acc_val,
+                            "macro_f1_pct": f1_val,
+                        }
                         continue
 
                     probs = m_obj.predict_proba(latest_feats)[0]
@@ -597,6 +651,9 @@ def get_all_models_comparison():
                         "p_hold": round(p_hold, 4),
                         "p_down": round(p_down, 4),
                         "conviction": round(conviction, 4),
+                        "directional_accuracy_pct": dir_acc,
+                        "accuracy_pct": acc_val,
+                        "macro_f1_pct": f1_val,
                     }
 
                 # Calculate consensus
@@ -619,6 +676,15 @@ def get_all_models_comparison():
                     consensus = "NEUTRAL / CHOP"
                     consensus_type = "wait"
 
+                # Dynamic recommendation based strictly on validated out-of-sample predictive accuracy
+                best_rec = stock_eval.get("recommendation", {
+                    "winner": "Similar Performance",
+                    "badge_text": "Similar Performance",
+                    "status": "TIED",
+                    "margin_pct": 0.0,
+                    "tooltip": "Recommendation based on validated out-of-sample predictive performance."
+                })
+
                 stock_rows.append({
                     "symbol": sym,
                     "close": round(last_close, 2),
@@ -627,6 +693,7 @@ def get_all_models_comparison():
                     "consensus": consensus,
                     "consensus_type": consensus_type,
                     "models": model_res,
+                    "best_predicting_model": best_rec,
                 })
             except Exception as e:
                 print(f"Error processing {sym}: {e}")
@@ -637,10 +704,23 @@ def get_all_models_comparison():
             "timestamp": datetime.now().isoformat(),
             "breadth_pct": round(breadth_pct, 1),
             "total_stocks": len(stock_rows),
+            "evaluation_window": eval_window,
             "models_evaluated": MODELS,
             "model_labels": MODEL_LABELS,
             "stocks": stock_rows,
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/best-predicting-model")
+def get_best_predicting_model(eval_window: str = Query("test", description="Evaluation window: test, val, or combined")):
+    """
+    Return dynamically evaluated best predicting model for each stock based strictly on 
+    out-of-sample predictive accuracy & Macro F1 without data leakage, independent of trading PnL.
+    """
+    try:
+        return compute_all_models_predictive_metrics(eval_window)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -817,6 +897,36 @@ def get_validation_checks():
         "total_checks": len(checks),
         "checks": checks,
     }
+
+
+@app.get("/api/download/presentation")
+def download_presentation():
+    """Download the official Quantara Project Presentation PowerPoint (.pptx)"""
+    pptx_path = ROOT / "QUANTARA_PROJECT_PRESENTATION.pptx"
+    if not pptx_path.exists():
+        pptx_path = STATIC_DIR / "QUANTARA_PROJECT_PRESENTATION.pptx"
+    if not pptx_path.exists():
+        raise HTTPException(status_code=404, detail="Presentation file not found.")
+    return FileResponse(
+        path=str(pptx_path),
+        filename="QUANTARA_PROJECT_PRESENTATION.pptx",
+        media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    )
+
+
+@app.get("/api/download/guide")
+def download_presentation_guide():
+    """Download the comprehensive viva and technical defense guide (.md)"""
+    guide_path = ROOT / "PROJECT_PRESENTATION_GUIDE.md"
+    if not guide_path.exists():
+        guide_path = STATIC_DIR / "PROJECT_PRESENTATION_GUIDE.md"
+    if not guide_path.exists():
+        raise HTTPException(status_code=404, detail="Guide file not found.")
+    return FileResponse(
+        path=str(guide_path),
+        filename="PROJECT_PRESENTATION_GUIDE.md",
+        media_type="text/markdown",
+    )
 
 
 # Mount frontend static directory

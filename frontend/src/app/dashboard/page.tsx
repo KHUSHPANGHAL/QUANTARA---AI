@@ -21,6 +21,10 @@ const TradingViewCandleChart = dynamic(
   () => import("@/components/charts/TradingViewCandleChart").then((m) => m.TradingViewCandleChart),
   { ssr: false, loading: () => <div className="h-[380px] flex items-center justify-center font-mono text-xs text-text-muted">Loading Candlestick Engine...</div> }
 );
+const ModelForecastTrajectoryChart = dynamic(
+  () => import("@/components/charts/ModelForecastTrajectoryChart").then((m) => m.ModelForecastTrajectoryChart),
+  { ssr: false, loading: () => <div className="h-[380px] flex items-center justify-center font-mono text-xs text-text-muted">Loading Forecast Trajectory...</div> }
+);
 const D3ConfidenceBands = dynamic(
   () => import("@/components/charts/D3ConfidenceBands").then((m) => m.D3ConfidenceBands),
   { ssr: false }
@@ -101,6 +105,7 @@ export default function CoreDashboardPage() {
 
   const [timeframe, setTimeframe] = useState("6mo");
   const [chartType, setChartType] = useState<"candle" | "line">("candle");
+  const [chartViewMode, setChartViewMode] = useState<"candlestick" | "forecast">("candlestick");
   const [horizon, setHorizon] = useState("5d");
   const [indicators, setIndicators] = useState({ sma: true, ema: false, bb: true, rsi: true, macd: true });
   const [currentTime, setCurrentTime] = useState("");
@@ -399,61 +404,121 @@ export default function CoreDashboardPage() {
               <div className="flex items-center gap-2">
                 <BarChart2 className="w-4 h-4 text-accent" />
                 <h3 className="text-xs font-bold uppercase tracking-wider text-text-primary font-mono">
-                  TradingView Technical Studio · {selectedSymbol}
+                  {chartViewMode === "candlestick" ? "TradingView Technical Studio" : "Model Prediction Trajectory"} · {selectedSymbol.replace(".NS", "")}
                 </h3>
               </div>
 
-              {/* Timeframes & Indicators */}
-              <div className="flex items-center gap-2 flex-wrap font-mono">
-                {/* Timeframe Bar */}
-                <div className="flex items-center bg-elevated p-0.5 rounded border border-border">
-                  {["1mo", "3mo", "6mo", "1y"].map((t) => (
-                    <button
-                      key={t}
-                      onClick={() => setTimeframe(t)}
-                      className={`px-2 py-0.5 rounded text-[11px] uppercase transition-colors ${
-                        timeframe === t ? "bg-accent/20 text-accent font-bold" : "text-text-muted hover:text-text-primary"
-                      }`}
-                    >
-                      {t.replace("mo", "M")}
-                    </button>
-                  ))}
+              {/* In-Place View Switcher (Clean, Zero Clutter) */}
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center bg-elevated p-0.5 rounded border border-border font-mono text-xs">
+                  <button
+                    onClick={() => setChartViewMode("candlestick")}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded transition-all font-semibold ${
+                      chartViewMode === "candlestick"
+                        ? "bg-accent/20 text-accent font-bold border border-accent/40 shadow-sm"
+                        : "text-text-muted hover:text-text-primary"
+                    }`}
+                  >
+                    <BarChart2 className="w-3.5 h-3.5" />
+                    <span>Real-Time Candlesticks</span>
+                  </button>
+
+                  <button
+                    onClick={() => setChartViewMode("forecast")}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded transition-all font-semibold ${
+                      chartViewMode === "forecast"
+                        ? "bg-accent/20 text-accent font-bold border border-accent/40 shadow-sm"
+                        : "text-text-muted hover:text-text-primary"
+                    }`}
+                  >
+                    <LineChart className="w-3.5 h-3.5" />
+                    <span>Forecast Trajectory</span>
+                  </button>
                 </div>
 
-                {/* Overlays */}
-                <div className="flex items-center gap-1 text-[11px]">
-                  <button
-                    onClick={() => setIndicators((prev) => ({ ...prev, sma: !prev.sma }))}
-                    className={`px-2 py-0.5 rounded border ${
-                      indicators.sma ? "bg-accent/20 border-accent text-accent font-bold" : "bg-elevated border-border text-text-muted"
-                    }`}
-                  >
-                    SMA 20/50
-                  </button>
-                  <button
-                    onClick={() => setIndicators((prev) => ({ ...prev, bb: !prev.bb }))}
-                    className={`px-2 py-0.5 rounded border ${
-                      indicators.bb ? "bg-warning/20 border-warning text-warning font-bold" : "bg-elevated border-border text-text-muted"
-                    }`}
-                  >
-                    Bollinger
-                  </button>
-                </div>
+                {/* Sub-controls depending on view mode */}
+                {chartViewMode === "candlestick" ? (
+                  <div className="flex items-center gap-2 flex-wrap font-mono">
+                    {/* Timeframe Bar */}
+                    <div className="flex items-center bg-elevated p-0.5 rounded border border-border">
+                      {["1mo", "3mo", "6mo", "1y"].map((t) => (
+                        <button
+                          key={t}
+                          onClick={() => setTimeframe(t)}
+                          className={`px-2 py-0.5 rounded text-[11px] uppercase transition-colors ${
+                            timeframe === t ? "bg-accent/20 text-accent font-bold" : "text-text-muted hover:text-text-primary"
+                          }`}
+                        >
+                          {t.replace("mo", "M")}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Overlays */}
+                    <div className="flex items-center gap-1 text-[11px]">
+                      <button
+                        onClick={() => setIndicators((prev) => ({ ...prev, sma: !prev.sma }))}
+                        className={`px-2 py-0.5 rounded border ${
+                          indicators.sma ? "bg-accent/20 border-accent text-accent font-bold" : "bg-elevated border-border text-text-muted"
+                        }`}
+                      >
+                        SMA 20/50
+                      </button>
+                      <button
+                        onClick={() => setIndicators((prev) => ({ ...prev, bb: !prev.bb }))}
+                        className={`px-2 py-0.5 rounded border ${
+                          indicators.bb ? "bg-warning/20 border-warning text-warning font-bold" : "bg-elevated border-border text-text-muted"
+                        }`}
+                      >
+                        Bollinger
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* Forecast Horizon Selector */
+                  <div className="flex items-center gap-1.5 font-mono text-xs">
+                    <span className="text-[10px] uppercase font-bold text-text-muted">Horizon:</span>
+                    <div className="flex items-center bg-elevated p-0.5 rounded border border-border">
+                      {["1d", "5d", "30d"].map((h) => (
+                        <button
+                          key={h}
+                          onClick={() => setHorizon(h)}
+                          className={`px-2 py-0.5 rounded text-[11px] uppercase transition-colors font-bold ${
+                            horizon === h ? "bg-accent/20 text-accent" : "text-text-muted hover:text-text-primary"
+                          }`}
+                        >
+                          {h.toUpperCase()}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* TradingView Candlestick Chart */}
-            <TradingViewCandleChart
-              candles={candles}
-              sma20={indicators.sma ? sma20 : undefined}
-              sma50={indicators.sma ? sma50 : undefined}
-              height={380}
-            />
+            {/* In-Place Chart Swap (Same 380px height - No Layout Shift) */}
+            {chartViewMode === "candlestick" ? (
+              <TradingViewCandleChart
+                candles={candles}
+                sma20={indicators.sma ? sma20 : undefined}
+                sma50={indicators.sma ? sma50 : undefined}
+                height={380}
+              />
+            ) : (
+              <ModelForecastTrajectoryChart
+                symbol={selectedSymbol}
+                model={selectedModel}
+                horizon={horizon}
+                currentPrice={curPrice}
+                candles={candles}
+                height={380}
+              />
+            )}
           </div>
 
           {/* Quantitative Inference: What-If Simulator + Confidence Bands */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
-            {/* Live Interactive What-If Simulation Panel */}
+            {/* Live Interactive What-If Simulation Panel & Kelly Sizer */}
             <WhatIfSimulationPanel
               symbol={selectedSymbol}
               model={selectedModel}
@@ -462,6 +527,7 @@ export default function CoreDashboardPage() {
               onRunSimulation={handleRunSimulation}
               signal={simulatedSignal}
               confidence={simulatedConfidence}
+              currentPrice={curPrice}
             />
 
             {/* D3 5-Day Prediction Fan Chart */}

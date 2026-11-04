@@ -118,13 +118,13 @@ class MarketOverviewResponse(BaseModel):
 # ══════════════════════════════════════════════════════════════════════════
 
 MASTER_TICKERS = [
-    {"symbol": "TCS.NS", "name": "Tata Consultancy Services", "sector": "Technology", "price": 2436.90, "change_pct": -2.49, "volume": 2420500},
-    {"symbol": "RELIANCE.NS", "name": "Reliance Industries", "sector": "Energy / Conglomerate", "price": 1299.50, "change_pct": -0.64, "volume": 5120000},
+    {"symbol": "TCS.NS", "name": "Tata Consultancy Services", "sector": "Technology", "price": 2436.00, "change_pct": -2.52, "volume": 2420500},
+    {"symbol": "RELIANCE.NS", "name": "Reliance Industries", "sector": "Energy / Conglomerate", "price": 1311.00, "change_pct": 0.24, "volume": 5120000},
     {"symbol": "ICICIBANK.NS", "name": "ICICI Bank", "sector": "Banking & Financials", "price": 1418.40, "change_pct": -0.43, "volume": 4820000},
-    {"symbol": "BHARTIARTL.NS", "name": "Bharti Airtel", "sector": "Telecommunications", "price": 2051.50, "change_pct": -0.65, "volume": 3100000},
+    {"symbol": "BHARTIARTL.NS", "name": "Bharti Airtel", "sector": "Telecommunications", "price": 2067.60, "change_pct": 0.13, "volume": 3100000},
     {"symbol": "INFY.NS", "name": "Infosys", "sector": "Technology", "price": 1122.60, "change_pct": -2.22, "volume": 4450000},
     {"symbol": "ITC.NS", "name": "ITC Limited", "sector": "Consumer Goods (FMCG)", "price": 280.60, "change_pct": 2.45, "volume": 6200000},
-    {"symbol": "HDFCBANK.NS", "name": "HDFC Bank", "sector": "Banking & Financials", "price": 731.35, "change_pct": 0.81, "volume": 8100000},
+    {"symbol": "HDFCBANK.NS", "name": "HDFC Bank", "sector": "Banking & Financials", "price": 736.70, "change_pct": 1.54, "volume": 8100000},
     {"symbol": "SBIN.NS", "name": "State Bank of India", "sector": "Banking & Financials", "price": 975.50, "change_pct": 0.54, "volume": 7400000},
 ]
 
