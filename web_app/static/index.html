@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quantara AI — Research Terminal</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/apexcharts@3.45.2/dist/apexcharts.min.js"></script>
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- Header & Navigation -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-name">QUANTARA</span>
+      <span class="brand-sub">Research Terminal</span>
+    </div>
+
+    <nav class="nav-tabs" role="tablist">
+      <button class="tab-btn active" data-tab="signals" role="tab" aria-selected="true">Signals</button>
+      <button class="tab-btn" data-tab="chartlab" role="tab" aria-selected="false">Charts</button>
+      <button class="tab-btn" data-tab="backtest" role="tab" aria-selected="false">Backtest</button>
+      <button class="tab-btn" data-tab="blotter" role="tab" aria-selected="false">Trades</button>
+      <button class="tab-btn" data-tab="audit" role="tab" aria-selected="false">Audit</button>
+    </nav>
+
+    <div class="topbar-right">
+      <div class="model-selector">
+        <label for="globalModelSelect">Model</label>
+        <select id="globalModelSelect">
+          <option value="logistic_regression">Logistic Regression</option>
+          <option value="lightgbm">LightGBM</option>
+          <option value="random_forest">Random Forest</option>
+        </select>
+      </div>
+
+      <div class="status-indicator" id="systemStatus">
+        <div class="status-dot"></div>
+        <span id="systemStatusText">ONLINE</span>
+      </div>
+
+      <div class="clock" id="clockDisplay">--:--:-- IST</div>
+    </div>
+  </header>
+
+  <!-- Main Viewports -->
+  <main class="main-content">
+
+    <!-- View 1: Signals -->
+    <div class="tab-panel active" id="tab-signals" role="tabpanel">
+      <!-- Market Regime Bar -->
+      <div class="regime-bar">
+        <div class="regime-info">
+          <span class="regime-pill neutral" id="regimePill">LOADING</span>
+          <span class="regime-text" id="regimeDesc">Evaluating 20-day market breadth...</span>
+        </div>
+        <div class="regime-stats">
+          <div class="stat-item">
+            <span class="stat-lbl">Breadth:</span>
+            <span class="stat-val" id="regimeBreadth">—</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-lbl">Above SMA20:</span>
+            <span class="stat-val" id="regimeAbove">—</span>
+          </div>
+          <button class="btn" id="refreshBtn" onclick="refreshPredictions(true)">Refresh</button>
+        </div>
+      </div>
+
+      <!-- KPI Summary Bar -->
+      <div class="kpi-bar">
+        <div class="kpi-unit">
+          <span class="kpi-title">Long Signals:</span>
+          <span class="kpi-number val-up" id="kpiBuy">—</span>
+        </div>
+        <div class="kpi-unit">
+          <span class="kpi-title">Short/Hedge:</span>
+          <span class="kpi-number val-down" id="kpiSell">—</span>
+        </div>
+        <div class="kpi-unit">
+          <span class="kpi-title">Neutral/Cash:</span>
+          <span class="kpi-number val-warn" id="kpiWait">—</span>
+        </div>
+        <div class="kpi-unit">
+          <span class="kpi-title">Top Conviction:</span>
+          <span class="kpi-number mono" id="kpiTopPick">—</span>
+        </div>
+      </div>
+
+      <!-- Live Predictions Matrix -->
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Live Predictions (5-Day Horizon)</div>
+            <div class="panel-subtitle">NSE liquid equity universe · Forward classification &amp; conviction scores</div>
+          </div>
+        </div>
+        <div class="table-wrap" id="predictionsTableWrap">
+          <div class="state-message">Loading market signals…</div>
+        </div>
+      </div>
+
+      <!-- Unified Model Evaluation & Consensus -->
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Model Specifications &amp; Consensus Evaluation</div>
+            <div class="panel-subtitle">Audited metrics across 248 trading sessions and real-time agreement</div>
+          </div>
+        </div>
+        <div class="panel-body" id="modelEvalWrap">
+          <div class="state-message">Loading model evaluations…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- View 2: Chart Lab -->
+    <div class="tab-panel" id="tab-chartlab" role="tabpanel">
+      <div class="chartlab-grid">
+        <!-- Sidebar -->
+        <aside class="sidebar-panel">
+          <div class="sidebar-section-title">Equities</div>
+          <div class="stock-list" id="stockList"></div>
+
+          <div class="sidebar-section-title">Lookback Window</div>
+          <div class="period-bar">
+            <button class="btn-toggle active" onclick="setPeriod('1mo', this)">1M</button>
+            <button class="btn-toggle" onclick="setPeriod('3mo', this)">3M</button>
+            <button class="btn-toggle" onclick="setPeriod('6mo', this)">6M</button>
+            <button class="btn-toggle" onclick="setPeriod('1y', this)">1Y</button>
+          </div>
+
+          <div class="sidebar-section-title">Overlays &amp; Indicators</div>
+          <div class="indicator-bar" style="flex-direction:column;">
+            <button class="btn-toggle active" onclick="toggleIndicator('sma', this)">SMA 20/50</button>
+            <button class="btn-toggle active" onclick="toggleIndicator('bb', this)">Bollinger Bands</button>
+            <button class="btn-toggle active" onclick="toggleIndicator('rsi', this)">RSI 14</button>
+            <button class="btn-toggle active" onclick="toggleIndicator('macd', this)">MACD</button>
+          </div>
+        </aside>
+
+        <!-- Main Chart Pane -->
+        <section>
+          <div class="chart-header">
+            <div>
+              <div style="font-size:15px;font-weight:700;" id="chartStockName">Select stock</div>
+              <div style="font-size:11px;color:var(--text-2);" id="chartStockMeta">—</div>
+            </div>
+            <div style="text-align:right;">
+              <div class="stat-val" style="font-size:18px;" id="chartStockPrice">—</div>
+              <div class="stat-val" id="chartStockChange">—</div>
+            </div>
+          </div>
+
+          <div class="chart-box">
+            <div id="chartCandleEl"></div>
+            <div id="chartVolumeEl"></div>
+          </div>
+
+          <div class="oscillators-row" id="oscillatorsRow">
+            <div class="chart-box">
+              <div style="font-size:10px;font-weight:600;color:var(--text-2);text-transform:uppercase;margin-bottom:4px;">RSI 14 (30/70)</div>
+              <div id="chartRsiEl"></div>
+            </div>
+            <div class="chart-box">
+              <div style="font-size:10px;font-weight:600;color:var(--text-2);text-transform:uppercase;margin-bottom:4px;">MACD (12, 26, 9)</div>
+              <div id="chartMacdEl"></div>
+            </div>
+          </div>
+
+          <div class="prediction-summary" id="stockPredReadout">
+            <div class="state-message">Select a stock to load inference.</div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <!-- View 3: Backtest -->
+    <div class="tab-panel" id="tab-backtest" role="tabpanel">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Portfolio Equity Trajectories</div>
+            <div class="panel-subtitle">248 trading sessions · ₹1,00,000 starting capital · Cash allocation rule comparison</div>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div id="chartEquityEl"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Strategy Performance Summary</div>
+        </div>
+        <div class="table-wrap" id="backtestTableWrap">
+          <div class="state-message">Loading strategy metrics…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- View 4: Blotter -->
+    <div class="tab-panel" id="tab-blotter" role="tabpanel">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Trade Execution Blotter</div>
+            <div class="panel-subtitle" id="blotterCount">Simulated portfolio order logs</div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <input type="text" id="blotterSearch" placeholder="Filter symbol…">
+            <select id="blotterDir">
+              <option value="">All Directions</option>
+              <option value="LONG">LONG</option>
+              <option value="SHORT">SHORT</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-wrap" style="max-height:550px;overflow-y:auto;">
+          <table class="data-table" id="blotterTable">
+            <thead id="blotterTableHead"></thead>
+            <tbody id="blotterTableBody">
+              <tr><td colspan="12" class="state-message">Loading blotter records…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- View 5: Audit -->
+    <div class="tab-panel" id="tab-audit" role="tabpanel">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">Automated Integrity Checks</div>
+              <div class="panel-subtitle">Chronological embargoes, finite input checks, zero-leakage rules</div>
+            </div>
+            <span class="signal-tag buy" id="auditSummaryBadge">—</span>
+          </div>
+          <div class="audit-list" id="auditListEl">
+            <div class="state-message">Loading verification checks…</div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">Feature Importance (Gain)</div>
+              <div class="panel-subtitle">Top 20 technical features driving 5-day horizon classification</div>
+            </div>
+          </div>
+          <div class="panel-body">
+            <div id="chartFeaturesEl"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Notification Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

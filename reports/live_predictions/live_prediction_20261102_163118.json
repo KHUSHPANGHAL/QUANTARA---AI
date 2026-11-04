@@ -1,0 +1,28 @@
+{
+  "timestamp": "2026-11-02T16:31:18.887823",
+  "model": "lightgbm",
+  "market_regime": {
+    "breadth_pct": 100.0,
+    "status": "BULLISH_EXPANSION",
+    "guidance": "Favorable market breadth. Standard swing sizing permitted."
+  },
+  "predictions": [
+    {
+      "Symbol": "TCS.NS",
+      "Latest Close": "Rs 2,501.70",
+      "1D %": "-0.04%",
+      "RSI-14": "67.4",
+      "Vol 20d": "35.7%",
+      "P(DOWN)": "36.5%",
+      "P(HOLD)": "30.6%",
+      "P(UP)": "32.9%",
+      "Conviction": -0.0358,
+      "Forecast Signal": "WAIT / CHOP",
+      "raw_close": 2501.699951171875,
+      "raw_p_up": 0.32924799292939266,
+      "raw_p_down": 0.36509763965638964,
+      "raw_conviction": -0.035849646726996975,
+      "latest_bar_date": "2026-11-02"
+    }
+  ]
+}
