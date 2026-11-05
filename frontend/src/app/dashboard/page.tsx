@@ -8,10 +8,9 @@ import {
   fetchLivePredictions,
   fetchStockHistory,
   generateConfidenceBands,
-  fetchTradeBlotter,
   UNIVERSE,
 } from "@/lib/api";
-import { ModelId, CandleBar, BlotterTrade } from "@/lib/types";
+import { ModelId, CandleBar } from "@/lib/types";
 
 import dynamic from "next/dynamic";
 
@@ -42,7 +41,6 @@ import { BacktestSection } from "@/features/backtest/BacktestSection";
 import { WatchlistPanel } from "@/features/watchlist/WatchlistPanel";
 import { MarketOverviewSection } from "@/features/market/MarketOverviewSection";
 import { ModelConsensusMatrix } from "@/components/dashboard/ModelConsensusMatrix";
-import { OrderBlotterTable } from "@/components/dashboard/OrderBlotterTable";
 import { CommandPalette } from "@/components/command/CommandPalette";
 import { ShortcutsModal } from "@/components/ui/ShortcutsModal";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
@@ -95,7 +93,6 @@ export default function CoreDashboardPage() {
   const [sma20, setSma20] = useState<[number, number][]>([]);
   const [sma50, setSma50] = useState<[number, number][]>([]);
   const [predictions, setPredictions] = useState<any[]>([]);
-  const [trades, setTrades] = useState<BlotterTrade[]>([]);
 
   const [timeframe, setTimeframe] = useState("6mo");
   const [chartType, setChartType] = useState<"candle" | "line">("candle");
@@ -142,13 +139,11 @@ export default function CoreDashboardPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [commandPaletteOpen]);
 
-  // Load predictions and blotter data
+  // Load predictions
   useEffect(() => {
     async function loadData() {
       const predData = await fetchLivePredictions(selectedModel);
       setPredictions(predData.predictions || []);
-      const blotterData = await fetchTradeBlotter();
-      setTrades(blotterData);
     }
     loadData();
   }, [selectedModel]);
@@ -560,9 +555,6 @@ export default function CoreDashboardPage() {
 
           {/* Model Consensus Agreement Matrix Across Stocks */}
           <ModelConsensusMatrix predictions={predictions} />
-
-          {/* Real-Time Order Execution Blotter */}
-          <OrderBlotterTable trades={trades} />
         </div>
       </div>
     </div>
