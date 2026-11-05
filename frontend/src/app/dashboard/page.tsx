@@ -8,7 +8,6 @@ import {
   fetchLivePredictions,
   fetchStockHistory,
   generateConfidenceBands,
-  getShapAttributions,
   fetchTradeBlotter,
   UNIVERSE,
 } from "@/lib/api";
@@ -27,10 +26,6 @@ const ModelForecastTrajectoryChart = dynamic(
 );
 const D3ConfidenceBands = dynamic(
   () => import("@/components/charts/D3ConfidenceBands").then((m) => m.D3ConfidenceBands),
-  { ssr: false }
-);
-const D3ShapWaterfall = dynamic(
-  () => import("@/components/charts/D3ShapWaterfall").then((m) => m.D3ShapWaterfall),
   { ssr: false }
 );
 const D3ReturnHeatmap = dynamic(
@@ -66,7 +61,6 @@ import {
   TrendingUp,
   Cpu,
   Sliders,
-  Layers,
   LineChart,
   BarChart2,
   Sparkles,
@@ -184,7 +178,6 @@ export default function CoreDashboardPage() {
   const curPred = predictions.find((p) => (p.Symbol || p.symbol) === selectedSymbol) || { conviction: 0.35, signal: "BUY / LONG" };
 
   const confidencePoints = generateConfidenceBands(curPrice, simulatedConviction);
-  const shapFeatures = getShapAttributions();
 
   // Handle What-If simulation re-computation
   const handleRunSimulation = (overrides: { volatility: number; volume_shift: number; sentiment_score: number }) => {
@@ -556,19 +549,8 @@ export default function CoreDashboardPage() {
           {/* Walk-Forward Backtest & Strategy Capital Simulation */}
           <BacktestSection model={selectedModel} />
 
-          {/* Model Comparison & SHAP Waterfall Attribution */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
-            <ModelComparisonGrid />
-            <div className="bg-surface border border-border rounded p-3.5 space-y-2">
-              <div className="flex items-center gap-1.5 border-b border-border pb-2">
-                <Layers className="w-3.5 h-3.5 text-accent" />
-                <h4 className="text-xs font-bold uppercase tracking-wider text-text-primary">
-                  Feature Importance Attribution (SHAP)
-                </h4>
-              </div>
-              <D3ShapWaterfall attributions={shapFeatures} height={220} />
-            </div>
-          </div>
+          {/* Cross-Model Performance Benchmarks */}
+          <ModelComparisonGrid />
 
           {/* Multi-Ticker Normalized Comparison (% Return) */}
           <MultiTickerCompare />

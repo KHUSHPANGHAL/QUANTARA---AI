@@ -237,3 +237,4 @@ def run_dl_inference(model_name: str, df_history: pd.DataFrame) -> Dict[str, Any
         "architecture": arch_name,
         "framework": f"PyTorch {torch.__version__}",
     }
+
