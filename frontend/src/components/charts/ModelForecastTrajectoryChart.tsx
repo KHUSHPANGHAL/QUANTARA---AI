@@ -60,6 +60,18 @@ export function ModelForecastTrajectoryChart({
       driftMultiplier: 0.9,
       curveStyle: "ensemble",
     },
+    lstm: {
+      name: "PyTorch LSTM Sequence",
+      tag: "Recurrent 2-Layer Temporal Memory",
+      driftMultiplier: 1.05,
+      curveStyle: "nonlinear",
+    },
+    gru: {
+      name: "PyTorch GRU Network",
+      tag: "Gated Recurrent Temporal Dynamics",
+      driftMultiplier: 1.02,
+      curveStyle: "nonlinear",
+    },
   };
 
   const currentMeta = modelMetadata[model] || modelMetadata.logistic_regression;

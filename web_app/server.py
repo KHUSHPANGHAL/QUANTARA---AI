@@ -40,6 +40,7 @@ from predict_live_market import (
     load_model_suite,
 )
 from model_evaluator import compute_all_models_predictive_metrics
+from dl_inference import run_dl_inference
 from api_contract_adapter import router as adapter_router, MASTER_TICKERS
 
 app = FastAPI(title="Quantara AI Institutional Research Platform", version="1.0.0")
@@ -259,7 +260,7 @@ async def websocket_ticks(websocket: WebSocket):
 
 @app.get("/api/live-predictions")
 def get_live_predictions(
-    model: str = Query("logistic_regression", regex="^(logistic_regression|lightgbm|random_forest)$"),
+    model: str = Query("logistic_regression", regex="^(logistic_regression|lightgbm|random_forest|lstm|gru)$"),
     refresh: bool = Query(False),
 ):
     global _LIVE_PREDICTIONS_CACHE
@@ -292,7 +293,10 @@ def get_live_predictions(
 
     # Compute fresh live predictions
     try:
-        model_obj = load_model_suite(model)
+        is_dl = model in ("lstm", "gru")
+        model_obj = None
+        if not is_dl:
+            model_obj = load_model_suite(model)
         feature_data = {}
         market_data = {}
         above_sma20_count = 0
@@ -335,10 +339,18 @@ def get_live_predictions(
 
         predictions = []
         for sym, feat_row in feature_data.items():
-            probs = model_obj.predict_proba(feat_row)[0]
-            pred_class = int(np.argmax(probs))
-            p_down, p_hold, p_up = float(probs[0]), float(probs[1]), float(probs[2])
-            conviction = float(p_up - p_down)
+            if is_dl:
+                dl_res = run_dl_inference(model, market_data[sym])
+                p_down = dl_res["p_down"]
+                p_hold = dl_res["p_hold"]
+                p_up = dl_res["p_up"]
+                conviction = dl_res["conviction"]
+                pred_class = dl_res["pred_class"]
+            else:
+                probs = model_obj.predict_proba(feat_row)[0]
+                pred_class = int(np.argmax(probs))
+                p_down, p_hold, p_up = float(probs[0]), float(probs[1]), float(probs[2])
+                conviction = float(p_up - p_down)
 
             df_sym = market_data[sym]
             last_close = float(df_sym["Close"].iloc[-1])
@@ -559,6 +571,38 @@ def get_top_models():
                 "completed_trades": 177,
                 "status": "Production Non-Linear",
                 "summary": "Deep tree boosting model optimized for gain on 20 features (top: return_20d, volatility_20d). Highly sensitive to trend acceleration, best utilized when filtered through Quantara Rule F regime guards."
+            },
+            {
+                "id": "lstm",
+                "rank": 4,
+                "badge": "Deep Sequence Network",
+                "name": "PyTorch LSTM Classifier",
+                "architecture": "2-Layer Recurrent LSTM (64 Hidden Units, Dropout 0.2)",
+                "win_rate_pct": 46.89,
+                "profit_factor": 0.72,
+                "max_drawdown_pct": 22.10,
+                "sharpe_ratio": -1.10,
+                "total_return_pct": -12.40,
+                "vs_benchmark_pct": +2.05,
+                "completed_trades": 134,
+                "status": "Deep Learning (PyTorch)",
+                "summary": "Deep temporal recurrent neural network trained on 60-day historical sequence tensors. Captures multi-week price memory and momentum inertia using internal input, forget, and cell state gates."
+            },
+            {
+                "id": "gru",
+                "rank": 5,
+                "badge": "Gated Recurrent",
+                "name": "PyTorch GRU Classifier",
+                "architecture": "2-Layer Gated Recurrent Unit (64 Hidden Units, Dropout 0.2)",
+                "win_rate_pct": 39.37,
+                "profit_factor": 0.68,
+                "max_drawdown_pct": 25.40,
+                "sharpe_ratio": -1.28,
+                "total_return_pct": -15.10,
+                "vs_benchmark_pct": -0.65,
+                "completed_trades": 139,
+                "status": "Deep Learning (PyTorch)",
+                "summary": "Lightweight gated recurrent architecture using coupled reset and update gates. Offers lower computational latency and faster convergence on high-frequency temporal feature transitions."
             }
         ]
     }
@@ -801,9 +845,15 @@ def get_feature_importance():
 
 @app.get("/api/stock-predictions/{symbol}")
 def get_stock_predictions(symbol: str):
-    """Return predictions from all 3 models for a single stock — powers the multi-model comparison panel."""
-    MODELS = ["logistic_regression", "lightgbm", "random_forest"]
-    MODEL_LABELS = {"logistic_regression": "Logistic Regression", "lightgbm": "LightGBM", "random_forest": "Random Forest"}
+    """Return predictions from all 5 models (3 ML + 2 DL) for a single stock — powers the multi-model comparison panel."""
+    MODELS = ["logistic_regression", "random_forest", "lightgbm", "lstm", "gru"]
+    MODEL_LABELS = {
+        "logistic_regression": "Logistic Regression (L2)",
+        "random_forest": "Random Forest (Ensemble)",
+        "lightgbm": "LightGBM (Gradient Boosted)",
+        "lstm": "PyTorch LSTM (2-Layer Recurrent)",
+        "gru": "PyTorch GRU (Gated Recurrent Unit)"
+    }
 
     try:
         df = fetch_symbol_history(symbol)
@@ -821,18 +871,24 @@ def get_stock_predictions(symbol: str):
         results = []
         for model_name in MODELS:
             try:
-                model_obj = load_model_suite(model_name)
-                probs = model_obj.predict_proba(latest_feats)[0]
-                pred_class = int(np.argmax(probs))
-                p_down, p_hold, p_up = float(probs[0]), float(probs[1]), float(probs[2])
-                conviction = float(p_up - p_down)
-
-                if pred_class == 2 and p_up >= 0.40:
-                    signal = "BUY / LONG"
-                elif pred_class == 0 and p_down >= 0.40:
-                    signal = "SELL / HEDGE"
+                if model_name in ("lstm", "gru"):
+                    dl_res = run_dl_inference(model_name, df)
+                    p_down, p_hold, p_up = dl_res["p_down"], dl_res["p_hold"], dl_res["p_up"]
+                    conviction = dl_res["conviction"]
+                    signal = dl_res["signal"]
                 else:
-                    signal = "WAIT / CHOP"
+                    model_obj = load_model_suite(model_name)
+                    probs = model_obj.predict_proba(latest_feats)[0]
+                    pred_class = int(np.argmax(probs))
+                    p_down, p_hold, p_up = float(probs[0]), float(probs[1]), float(probs[2])
+                    conviction = float(p_up - p_down)
+
+                    if pred_class == 2 and p_up >= 0.40:
+                        signal = "BUY / LONG"
+                    elif pred_class == 0 and p_down >= 0.40:
+                        signal = "SELL / HEDGE"
+                    else:
+                        signal = "WAIT / CHOP"
 
                 results.append({
                     "model": model_name,

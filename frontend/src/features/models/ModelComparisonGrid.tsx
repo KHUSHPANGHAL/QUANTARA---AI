@@ -54,6 +54,28 @@ export function ModelComparisonGrid() {
       profitFactor: 0.62,
       maxDrawdown: 24.50,
     },
+    {
+      id: "lstm",
+      name: "PyTorch LSTM",
+      tag: "2-Layer Recurrent Sequence Net",
+      rmse: 15.80,
+      mae: 11.40,
+      dirAccuracy: 49.9,
+      winRate: 46.89,
+      profitFactor: 0.72,
+      maxDrawdown: 22.10,
+    },
+    {
+      id: "gru",
+      name: "PyTorch GRU",
+      tag: "Gated Recurrent Unit (Fast)",
+      rmse: 16.10,
+      mae: 11.75,
+      dirAccuracy: 48.7,
+      winRate: 39.37,
+      profitFactor: 0.68,
+      maxDrawdown: 25.40,
+    },
   ];
 
   return (
@@ -62,13 +84,13 @@ export function ModelComparisonGrid() {
         <div className="flex items-center gap-1.5">
           <Cpu className="w-3.5 h-3.5 text-accent" />
           <h4 className="text-xs font-bold uppercase tracking-wider text-text-primary">
-            Cross-Model Performance Benchmarks
+            Cross-Model Performance Benchmarks (ML &amp; DL)
           </h4>
         </div>
         <span className="text-[10px] text-text-muted font-mono">248 Out-of-Sample Sessions</span>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-2.5">
         {models.map((m) => {
           const isSelected = selectedModel === m.id;
           return (

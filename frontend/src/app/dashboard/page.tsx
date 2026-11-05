@@ -365,9 +365,15 @@ export default function CoreDashboardPage() {
                 onChange={(e) => setSelectedModel(e.target.value as ModelId)}
                 className="bg-elevated border border-border text-xs px-2 py-1 rounded text-text-primary outline-none focus:border-accent font-mono cursor-pointer"
               >
-                <option value="logistic_regression">Logistic Regression</option>
-                <option value="lightgbm">LightGBM (5D)</option>
-                <option value="random_forest">Random Forest</option>
+                <optgroup label="Classical Machine Learning">
+                  <option value="logistic_regression">Logistic Regression (L2)</option>
+                  <option value="lightgbm">LightGBM (Gradient Boosted)</option>
+                  <option value="random_forest">Random Forest (Ensemble)</option>
+                </optgroup>
+                <optgroup label="Deep Learning (PyTorch)">
+                  <option value="lstm">LSTM (2-Layer Recurrent)</option>
+                  <option value="gru">GRU (Gated Recurrent Unit)</option>
+                </optgroup>
               </select>
             </div>
 

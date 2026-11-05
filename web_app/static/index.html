@@ -34,9 +34,15 @@
       <div class="model-selector">
         <label for="globalModelSelect">Model</label>
         <select id="globalModelSelect">
-          <option value="logistic_regression">Logistic Regression</option>
-          <option value="lightgbm">LightGBM</option>
-          <option value="random_forest">Random Forest</option>
+          <optgroup label="Classical ML">
+            <option value="logistic_regression">Logistic Regression</option>
+            <option value="lightgbm">LightGBM</option>
+            <option value="random_forest">Random Forest</option>
+          </optgroup>
+          <optgroup label="Deep Learning (PyTorch)">
+            <option value="lstm">PyTorch LSTM</option>
+            <option value="gru">PyTorch GRU</option>
+          </optgroup>
         </select>
       </div>
 

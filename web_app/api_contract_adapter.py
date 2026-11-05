@@ -156,6 +156,10 @@ def run_model_inference_adapter(symbol: str, horizon: str, model_name: str, over
         drift_bias *= 1.15
     elif model_name == "random_forest":
         drift_bias *= 0.95
+    elif model_name == "lstm":
+        drift_bias *= 1.05
+    elif model_name == "gru":
+        drift_bias *= 1.02
 
     # Process What-If parameter overrides if user manipulated the sliders
     vol_multiplier = 1.0
